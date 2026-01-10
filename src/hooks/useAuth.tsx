@@ -1,8 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { Capacitor } from '@capacitor/core';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 interface AuthContextType {
   user: User | null;
@@ -22,15 +20,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize Google Auth for native platforms
-    if (Capacitor.isNativePlatform()) {
-      GoogleAuth.initialize({
-        clientId: '944708960468-eqn03vl8rm1p24ghfbkt8m9enlijlld6.apps.googleusercontent.com',
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
-      });
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -70,48 +59,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        await GoogleAuth.signOut();
-      } catch (e) {
-        // Ignore if not signed in with Google
-      }
-    }
     await supabase.auth.signOut();
   };
 
   const signInWithGoogle = async () => {
-    const isNative = Capacitor.isNativePlatform();
-    
-    if (isNative) {
-      // Use native Google Sign-In for Android/iOS
-      try {
-        const googleUser = await GoogleAuth.signIn();
-        
-        if (googleUser.authentication?.idToken) {
-          const { error } = await supabase.auth.signInWithIdToken({
-            provider: 'google',
-            token: googleUser.authentication.idToken,
-          });
-          return { error };
-        }
-        return { error: new Error('No ID token received from Google. Please check your Google configuration.') };
-      } catch (error: any) {
-        console.error('Native Google Sign-In error:', error);
-        // Provide more descriptive error messages
-        const errorMessage = error?.message || error?.error || 'Google sign-in was cancelled or failed';
-        return { error: new Error(errorMessage) };
+    // Use Supabase OAuth for all platforms (web and native)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`
       }
-    } else {
-      // Use web OAuth for browser
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
-      });
-      return { error };
-    }
+    });
+    return { error };
   };
 
   return (
