@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Deep link configuration for OAuth callback -->
-    <string name="custom_url_scheme">com.plexkhmerzoon</string>
-</resources>
