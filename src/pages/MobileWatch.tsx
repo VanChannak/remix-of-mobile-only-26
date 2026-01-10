@@ -2,7 +2,20 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Play, Download, MoreVertical, Crown, ThumbsUp, Share2, Bookmark, Home, MessageSquare, Sparkles, List } from "lucide-react";
+import {
+  ChevronLeft,
+  Play,
+  Download,
+  MoreVertical,
+  Crown,
+  ThumbsUp,
+  Share2,
+  Bookmark,
+  Home,
+  MessageSquare,
+  Sparkles,
+  List,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import VideoPlayer from "@/components/VideoPlayer";
 import { VideoSource } from "@/lib/supabase";
@@ -11,7 +24,8 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommentsSection } from "@/components/CommentsSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { playWithExoPlayer, isExoPlayerAvailable } from '@/hooks/useExoPlayer';
+import { playWithExoPlayer, isExoPlayerAvailable } from "@/hooks/useExoPlayer";
+import { AdMob, AdOptions, BannerAdSize, BannerAdPosition } from "@capacitor-community/admob";
 
 interface Episode {
   id: string;
@@ -20,7 +34,7 @@ interface Episode {
   still_path?: string;
   season_id?: string;
   show_id?: string;
-  access_type?: 'free' | 'membership' | 'purchase';
+  access_type?: "free" | "membership" | "purchase";
 }
 
 interface Content {
@@ -56,8 +70,41 @@ const MobileWatch = () => {
   const [forYouContent, setForYouContent] = useState<Content[]>([]);
   const [castMembers, setCastMembers] = useState<any[]>([]);
 
-  const contentType = type || 'movie';
-  const isSeriesContent = contentType === 'series' || contentType === 'anime';
+  const contentType = type || "movie";
+  const isSeriesContent = contentType === "series" || contentType === "anime";
+
+  // Show and hide the bottom banner ad for this page
+  useEffect(() => {
+    const showBanner = async () => {
+      try {
+        const options: AdOptions = {
+          adId: "ca-app-pub-4789683198372521/6279462067", // Your Banner Ad ID
+          adSize: BannerAdSize.BANNER,
+          position: BannerAdPosition.BOTTOM_CENTER,
+          margin: 0,
+          // Set to true during development to avoid policy violations
+          isTesting: false,
+        };
+        await AdMob.showBanner(options);
+      } catch (e) {
+        console.error("Error showing banner ad:", e);
+      }
+    };
+
+    showBanner();
+
+    // Return a cleanup function to hide the banner when the component unmounts
+    return () => {
+      const hideBanner = async () => {
+        try {
+          await AdMob.hideBanner();
+        } catch (e) {
+          console.error("Error hiding banner ad:", e);
+        }
+      };
+      hideBanner();
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount and unmount
 
   useEffect(() => {
     if (id) {
@@ -74,11 +121,11 @@ const MobileWatch = () => {
 
   useEffect(() => {
     if (episodes.length > 0 && season && episode) {
-      const targetSeason = seasons.find(s => s.season_number === parseInt(season));
+      const targetSeason = seasons.find((s) => s.season_number === parseInt(season));
       if (targetSeason) {
         setSelectedSeasonId(targetSeason.id);
-        const targetEpisode = episodes.find(ep => 
-          ep.season_id === targetSeason.id && ep.episode_number === parseInt(episode)
+        const targetEpisode = episodes.find(
+          (ep) => ep.season_id === targetSeason.id && ep.episode_number === parseInt(episode),
         );
         if (targetEpisode) {
           setCurrentEpisode(targetEpisode);
@@ -94,43 +141,45 @@ const MobileWatch = () => {
     try {
       setLoading(true);
       const isNumeric = /^\d+$/.test(id!);
-      let query = supabase.from('content').select('*');
-      
+      let query = supabase.from("content").select("*");
+
       if (isNumeric) {
-        query = query.eq('tmdb_id', id);
+        query = query.eq("tmdb_id", id);
       } else {
-        query = query.eq('id', id);
+        query = query.eq("id", id);
       }
 
       const { data } = await query.maybeSingle();
       if (data) {
         setContent(data);
-        
+
         // Parse cast members
         if (data.cast_members) {
           try {
             const parsed = JSON.parse(data.cast_members);
-            setCastMembers(parsed.slice(0, 10).map((c: any) => ({
-              name: c.name || c.actor_name,
-              image: c.profile_path?.startsWith('http') 
-                ? c.profile_path 
-                : c.profile_path 
-                  ? `https://image.tmdb.org/t/p/w185${c.profile_path}` 
-                  : null
-            })));
+            setCastMembers(
+              parsed.slice(0, 10).map((c: any) => ({
+                name: c.name || c.actor_name,
+                image: c.profile_path?.startsWith("http")
+                  ? c.profile_path
+                  : c.profile_path
+                    ? `https://image.tmdb.org/t/p/w185${c.profile_path}`
+                    : null,
+              })),
+            );
           } catch (e) {}
         }
 
         // Fetch for you content
         const { data: forYou } = await supabase
-          .from('content')
-          .select('id, title, poster_path, content_type, tmdb_id')
-          .neq('id', data.id)
+          .from("content")
+          .select("id, title, poster_path, content_type, tmdb_id")
+          .neq("id", data.id)
           .limit(8);
         setForYouContent(forYou || []);
       }
     } catch (error) {
-      console.error('Error fetching content:', error);
+      console.error("Error fetching content:", error);
     } finally {
       setLoading(false);
     }
@@ -138,10 +187,10 @@ const MobileWatch = () => {
 
   const fetchSeasons = async () => {
     const { data } = await supabase
-      .from('seasons')
-      .select('*')
-      .eq('show_id', content!.id)
-      .order('season_number', { ascending: true });
+      .from("seasons")
+      .select("*")
+      .eq("show_id", content!.id)
+      .order("season_number", { ascending: true });
     setSeasons(data || []);
     if (data && data.length > 0 && !selectedSeasonId) {
       setSelectedSeasonId(data[0].id);
@@ -150,20 +199,20 @@ const MobileWatch = () => {
 
   const fetchEpisodes = async () => {
     const { data } = await supabase
-      .from('episodes')
-      .select('*')
-      .eq('show_id', content!.id)
-      .order('episode_number', { ascending: true });
+      .from("episodes")
+      .select("*")
+      .eq("show_id", content!.id)
+      .order("episode_number", { ascending: true });
     setEpisodes(data || []);
   };
 
   const fetchVideoSource = async (episodeId: string) => {
     const { data } = await supabase
-      .from('video_sources')
-      .select('*')
-      .eq('episode_id', episodeId)
-      .order('is_default', { ascending: false });
-    
+      .from("video_sources")
+      .select("*")
+      .eq("episode_id", episodeId)
+      .order("is_default", { ascending: false });
+
     if (data && data.length > 0) {
       setVideoSources(data as VideoSource[]);
     }
@@ -172,33 +221,33 @@ const MobileWatch = () => {
   const fetchMovieVideoSource = async () => {
     if (!content?.id) return;
     const { data } = await supabase
-      .from('video_sources')
-      .select('*')
-      .eq('media_id', content.id)
-      .order('is_default', { ascending: false });
-    
+      .from("video_sources")
+      .select("*")
+      .eq("media_id", content.id)
+      .order("is_default", { ascending: false });
+
     if (data && data.length > 0) {
       setVideoSources(data as VideoSource[]);
     }
   };
 
   const handleEpisodeClick = async (ep: Episode) => {
-    const seasonNum = seasons.find(s => s.id === ep.season_id)?.season_number || 1;
-    
+    const seasonNum = seasons.find((s) => s.id === ep.season_id)?.season_number || 1;
+
     // On Android native, use ExoPlayer
     if (isExoPlayerAvailable()) {
       const { data: sources } = await supabase
-        .from('video_sources')
-        .select('*')
-        .eq('episode_id', ep.id)
-        .order('is_default', { ascending: false });
+        .from("video_sources")
+        .select("*")
+        .eq("episode_id", ep.id)
+        .order("is_default", { ascending: false });
 
       if (sources && sources.length > 0) {
         const source = sources[0];
         let videoUrl = source.url;
-        
-        if (source.quality_urls && typeof source.quality_urls === 'object') {
-          const qualities = ['1080p', '720p', '480p', '360p'];
+
+        if (source.quality_urls && typeof source.quality_urls === "object") {
+          const qualities = ["1080p", "720p", "480p", "360p"];
           for (const q of qualities) {
             if ((source.quality_urls as Record<string, string>)[q]) {
               videoUrl = (source.quality_urls as Record<string, string>)[q];
@@ -210,14 +259,14 @@ const MobileWatch = () => {
         if (videoUrl) {
           await playWithExoPlayer(
             videoUrl,
-            content?.title || 'Video',
-            `S${seasonNum} E${ep.episode_number}: ${ep.title}`
+            content?.title || "Video",
+            `S${seasonNum} E${ep.episode_number}: ${ep.title}`,
           );
           return;
         }
       }
     }
-    
+
     // Web fallback - update URL and play inline
     setCurrentEpisode(ep);
     fetchVideoSource(ep.id);
@@ -226,10 +275,10 @@ const MobileWatch = () => {
 
   const displayEpisodes = useMemo(() => {
     if (!selectedSeasonId) return episodes;
-    return episodes.filter(ep => ep.season_id === selectedSeasonId);
+    return episodes.filter((ep) => ep.season_id === selectedSeasonId);
   }, [episodes, selectedSeasonId]);
 
-  const selectedSeason = seasons.find(s => s.id === selectedSeasonId);
+  const selectedSeason = seasons.find((s) => s.id === selectedSeasonId);
 
   if (loading) {
     return (
@@ -248,15 +297,15 @@ const MobileWatch = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black relative pt-[35px]">
+    <div className="min-h-screen bg-black relative pb-12">
       {/* Background - portrait poster with 10% blur */}
       {content.poster_path && (
-        <div 
+        <div
           className="fixed inset-0 z-0 animate-fade-in"
           style={{
             backgroundImage: `url(${content.poster_path})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center top',
+            backgroundSize: "cover",
+            backgroundPosition: "center top",
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black" />
@@ -274,13 +323,17 @@ const MobileWatch = () => {
             title={content.title}
             episodes={isSeriesContent ? episodes : undefined}
             seasons={isSeriesContent ? seasons : undefined}
-            onEpisodeSelect={isSeriesContent ? (epId) => {
-              const ep = episodes.find(e => e.id === epId);
-              if (ep) handleEpisodeClick(ep);
-            } : undefined}
+            onEpisodeSelect={
+              isSeriesContent
+                ? (epId) => {
+                    const ep = episodes.find((e) => e.id === epId);
+                    if (ep) handleEpisodeClick(ep);
+                  }
+                : undefined
+            }
             onSeasonSelect={isSeriesContent ? setSelectedSeasonId : undefined}
             accessType="free"
-            mediaType={contentType as 'movie' | 'series' | 'anime'}
+            mediaType={contentType as "movie" | "series" | "anime"}
             mediaId={content.id}
           />
         ) : (
@@ -292,6 +345,11 @@ const MobileWatch = () => {
 
       {/* Content Info */}
       <div className="relative z-10 p-4">
+        {/* Ad Placeholder for an ad below the player */}
+        <div className="mb-4 h-[100px] bg-white/10 flex items-center justify-center text-white/50 rounded-lg">
+          Ad Placeholder (Below Player)
+        </div>
+
         {/* Title & Actions */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0 pr-3">
@@ -344,7 +402,7 @@ const MobileWatch = () => {
                     )}
                   </div>
                   <span className="text-[10px] text-center text-white/60 max-w-[50px] truncate">
-                    {member.name?.split(' ')[0]}
+                    {member.name?.split(" ")[0]}
                   </span>
                 </div>
               ))}
@@ -356,7 +414,7 @@ const MobileWatch = () => {
         <Tabs defaultValue={isSeriesContent ? "episodes" : "foryou"} className="w-full">
           <TabsList className="w-full justify-center bg-transparent border-b border-white/10 rounded-none h-auto p-0 px-0 gap-0">
             {isSeriesContent && (
-              <TabsTrigger 
+              <TabsTrigger
                 value="episodes"
                 className="px-2 py-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs text-white/70 data-[state=active]:text-white"
               >
@@ -364,21 +422,21 @@ const MobileWatch = () => {
                 Episodes
               </TabsTrigger>
             )}
-            <TabsTrigger 
+            <TabsTrigger
               value="foryou"
               className="px-2 py-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs text-white/70 data-[state=active]:text-white"
             >
               <Sparkles className="h-3.5 w-3.5 mr-1" />
               For You
             </TabsTrigger>
-            <TabsTrigger 
+            <TabsTrigger
               value="comments"
               className="px-2 py-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs text-white/70 data-[state=active]:text-white"
             >
               <MessageSquare className="h-3.5 w-3.5 mr-1" />
               Comments
             </TabsTrigger>
-            <TabsTrigger 
+            <TabsTrigger
               value="home"
               className="px-2 py-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs text-white/70 data-[state=active]:text-white"
             >
@@ -394,7 +452,7 @@ const MobileWatch = () => {
               {seasons.length > 0 && (
                 <div className="mb-3 bg-white/5 rounded-lg p-3">
                   <p className="text-xs text-white/40 mb-1">Choose a season</p>
-                  <Select value={selectedSeasonId || ''} onValueChange={setSelectedSeasonId}>
+                  <Select value={selectedSeasonId || ""} onValueChange={setSelectedSeasonId}>
                     <SelectTrigger className="w-full h-9 bg-transparent border-0 text-sm font-medium text-white p-0">
                       <SelectValue placeholder="Select season" />
                     </SelectTrigger>
@@ -417,13 +475,13 @@ const MobileWatch = () => {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                      currentEpisode?.id === ep.id ? 'bg-primary/10' : 'hover:bg-white/5'
+                      currentEpisode?.id === ep.id ? "bg-primary/10" : "hover:bg-white/5"
                     }`}
                     onClick={() => handleEpisodeClick(ep)}
                   >
                     {/* Thumbnail with play icon - white 35% opacity */}
                     <div className="relative w-24 aspect-video rounded-lg overflow-hidden flex-shrink-0">
-                      <img 
+                      <img
                         src={ep.still_path || content.backdrop_path || "/placeholder.svg"}
                         alt={ep.title}
                         className="w-full h-full object-cover"
@@ -433,11 +491,11 @@ const MobileWatch = () => {
                         <Play className="h-7 w-7 text-white/35 fill-white/35" />
                       </div>
                       {/* Access badge */}
-                      {ep.access_type === 'free' ? (
+                      {ep.access_type === "free" ? (
                         <span className="absolute top-1 right-1 px-1.5 py-0.5 text-[8px] font-bold bg-green-500 text-white rounded uppercase">
                           Free
                         </span>
-                      ) : ep.access_type === 'membership' ? (
+                      ) : ep.access_type === "membership" ? (
                         <span className="absolute top-1 right-1 px-1.5 py-0.5 text-[8px] font-bold bg-red-600 text-white rounded uppercase flex items-center gap-0.5">
                           <Crown className="h-2 w-2" />
                           VIP
@@ -454,7 +512,7 @@ const MobileWatch = () => {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <button 
+                      <button
                         className="h-8 w-8 flex items-center justify-center text-white/50"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -463,7 +521,7 @@ const MobileWatch = () => {
                       >
                         <Download className="h-4 w-4" />
                       </button>
-                      <button 
+                      <button
                         className="h-8 w-8 flex items-center justify-center text-white/50"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -485,7 +543,7 @@ const MobileWatch = () => {
                   className="cursor-pointer"
                   onClick={() => {
                     const contentId = item.tmdb_id || item.id;
-                    if (item.content_type === 'movie') {
+                    if (item.content_type === "movie") {
                       navigate(`/watch/movie/${contentId}`);
                     } else {
                       navigate(`/watch/series/${contentId}/1/1`);
@@ -493,8 +551,8 @@ const MobileWatch = () => {
                   }}
                 >
                   <div className="aspect-[2/3] rounded-lg overflow-hidden">
-                    <img 
-                      src={item.poster_path || "/placeholder.svg"} 
+                    <img
+                      src={item.poster_path || "/placeholder.svg"}
                       alt={item.title}
                       className="w-full h-full object-cover"
                     />
@@ -507,26 +565,42 @@ const MobileWatch = () => {
 
           {/* Comments Tab */}
           <TabsContent value="comments" className="mt-3">
-            <CommentsSection 
+            <CommentsSection
               episodeId={currentEpisode?.id}
-              movieId={contentType === 'movie' ? content.id : undefined}
+              movieId={contentType === "movie" ? content.id : undefined}
             />
           </TabsContent>
 
           {/* Home Tab */}
           <TabsContent value="home" className="mt-3">
             <div className="space-y-2">
-              <Button variant="ghost" className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10" onClick={() => navigate('/')}>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10"
+                onClick={() => navigate("/")}
+              >
                 <Home className="h-5 w-5" />
                 Go to Home
               </Button>
-              <Button variant="ghost" className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10" onClick={() => navigate('/series')}>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10"
+                onClick={() => navigate("/series")}
+              >
                 Series
               </Button>
-              <Button variant="ghost" className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10" onClick={() => navigate('/movies')}>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10"
+                onClick={() => navigate("/movies")}
+              >
                 Movies
               </Button>
-              <Button variant="ghost" className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10" onClick={() => navigate('/dashboard')}>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-12 text-white hover:bg-white/10"
+                onClick={() => navigate("/dashboard")}
+              >
                 Dashboard
               </Button>
             </div>
