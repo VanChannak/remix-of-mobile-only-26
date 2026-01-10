@@ -248,7 +248,7 @@ const MobileWatch = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black relative">
+    <div className="min-h-screen bg-black relative pt-[35px]">
       {/* Background - portrait poster with 10% blur */}
       {content.poster_path && (
         <div 
