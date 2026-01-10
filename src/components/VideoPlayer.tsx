@@ -191,6 +191,7 @@ const VideoPlayer = ({
 }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeContainerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const shakaPlayerRef = useRef<shaka.Player | null>(null);
   
@@ -266,6 +267,9 @@ const VideoPlayer = ({
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [showEpisodesPanel, setShowEpisodesPanel] = useState(false);
   const [showSupportOverlay, setShowSupportOverlay] = useState(false);
+  // State for iframe/embed fullscreen with landscape rotation
+  const [isIframeFullscreen, setIsIframeFullscreen] = useState(false);
+  const [isIframeFullscreenTransitioning, setIsIframeFullscreenTransitioning] = useState(false);
   // Track which support checkpoints have been shown: start (0%), 50%, 85%
   const [shownSupportCheckpoints, setShownSupportCheckpoints] = useState<Set<'start' | '50' | '85'>>(new Set());
   const [hasAlreadySupported, setHasAlreadySupported] = useState(false);
@@ -1037,6 +1041,10 @@ const VideoPlayer = ({
         ScreenOrientation.lock({ orientation: 'portrait' }).catch(console.error);
         showStatusBar().catch(console.error);
       }
+      // Cleanup iframe fullscreen styles if active
+      const iframeStyle = document.getElementById('iframe-fullscreen-styles');
+      if (iframeStyle) iframeStyle.remove();
+      document.body.classList.remove('iframe-video-fullscreen-active');
     };
   }, []);
 
@@ -1366,6 +1374,118 @@ const VideoPlayer = ({
     // Use the hook's toggle which handles PWA, iPad, and native cases
     await iPadToggleFullscreen();
   }, [iPadToggleFullscreen]);
+
+  // Iframe/Embed fullscreen toggle with landscape rotation for mobile
+  const toggleIframeFullscreen = useCallback(async () => {
+    const container = iframeContainerRef.current;
+    if (!container || isIframeFullscreenTransitioning) return;
+    
+    setIsIframeFullscreenTransitioning(true);
+    const isNative = Capacitor.isNativePlatform();
+    const isMobile = /iPhone|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const orientation = screen.orientation as any;
+    
+    try {
+      if (!isIframeFullscreen) {
+        // ENTERING FULLSCREEN
+        await hideStatusBar();
+        
+        if (isNative) {
+          // Native app: use Capacitor orientation + immersive mode + CSS fullscreen
+          try {
+            await enterImmersiveMode();
+            await new Promise(resolve => setTimeout(resolve, 100));
+            await ScreenOrientation.lock({ orientation: 'landscape' });
+          } catch (e) {
+            console.warn('Could not enter immersive/landscape mode:', e);
+          }
+        } else if (isMobile) {
+          // Mobile web: try orientation lock
+          if (orientation && orientation.lock) {
+            try {
+              await orientation.lock('landscape');
+            } catch (e) {
+              console.log('Orientation lock not supported on this browser');
+            }
+          }
+        }
+        
+        // Apply CSS fullscreen styles for iframe
+        const style = document.createElement('style');
+        style.id = 'iframe-fullscreen-styles';
+        style.textContent = `
+          .iframe-video-fullscreen-container {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            z-index: 99999 !important;
+            background: black !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .iframe-video-fullscreen-container iframe {
+            width: 100% !important;
+            height: 100% !important;
+          }
+          body.iframe-video-fullscreen-active {
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+            height: 100% !important;
+            touch-action: none !important;
+          }
+          body.iframe-video-fullscreen-active nav,
+          body.iframe-video-fullscreen-active [data-bottom-nav],
+          body.iframe-video-fullscreen-active footer,
+          body.iframe-video-fullscreen-active header {
+            display: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+        document.body.classList.add('iframe-video-fullscreen-active');
+        container.classList.add('iframe-video-fullscreen-container');
+        setIsIframeFullscreen(true);
+      } else {
+        // EXITING FULLSCREEN
+        await showStatusBar();
+        
+        if (isNative) {
+          try {
+            await ScreenOrientation.lock({ orientation: 'portrait' });
+            await new Promise(resolve => setTimeout(resolve, 100));
+            await exitImmersiveMode();
+          } catch (e) {
+            console.warn('Could not exit immersive/portrait mode:', e);
+          }
+        } else if (isMobile) {
+          if (orientation && orientation.unlock) {
+            try {
+              orientation.unlock();
+            } catch (e) {
+              console.log('Orientation unlock not supported');
+            }
+          }
+        }
+        
+        // Remove CSS fullscreen styles
+        const style = document.getElementById('iframe-fullscreen-styles');
+        if (style) style.remove();
+        document.body.classList.remove('iframe-video-fullscreen-active');
+        container.classList.remove('iframe-video-fullscreen-container');
+        setIsIframeFullscreen(false);
+      }
+    } catch (error) {
+      console.error('Iframe fullscreen toggle error:', error);
+      setIsIframeFullscreen(false);
+    } finally {
+      setIsIframeFullscreenTransitioning(false);
+    }
+  }, [isIframeFullscreen, isIframeFullscreenTransitioning]);
 
   const togglePictureInPicture = async () => {
     if (!videoRef.current) return;
@@ -1720,8 +1840,12 @@ const VideoPlayer = ({
 
       {/* Iframe Element - Only load when user has access and server is not restricted */}
       {/* Supports VK Video URLs with automatic conversion to embed format */}
+      {/* Wrapped in a container for fullscreen with landscape rotation on mobile */}
       {(sourceType === "embed" || sourceType === "iframe") && !isLocked && !accessLoading && !allSourcesMobileOnly && !allSourcesWebOnly && !isCurrentServerRestricted && (
-        <>
+        <div 
+          ref={iframeContainerRef}
+          className="w-full h-full relative"
+        >
           <iframe
             ref={iframeRef}
             src={convertVkVideoUrl(currentServer.url)}
@@ -1730,7 +1854,19 @@ const VideoPlayer = ({
             allow="autoplay; encrypted-media; fullscreen"
             style={{ border: 'none' }}
           />
-        </>
+          {/* Fullscreen button for iframe - triggers landscape rotation on mobile */}
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={isIframeFullscreenTransitioning}
+            onClick={toggleIframeFullscreen}
+            className={`absolute bottom-2 right-2 z-[100] h-9 w-9 bg-black/60 text-white hover:bg-black/80 ${
+              isIframeFullscreenTransitioning ? 'opacity-50 cursor-wait' : ''
+            }`}
+          >
+            {isIframeFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+          </Button>
+        </div>
       )}
       
       {/* Lock overlay for restricted server selection */}
