@@ -11,13 +11,11 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: '#00000000',
     allowMixedContent: true,
-    // Enable hardware back button handling
     appendUserAgent: 'KHMERZOON-Native',
   },
   ios: {
     backgroundColor: '#00000000',
     contentInset: 'automatic',
-    // Preferred content mode for iOS
     preferredContentMode: 'mobile',
   },
   plugins: {
@@ -26,25 +24,12 @@ const config: CapacitorConfig = {
       style: 'DARK',
       backgroundColor: '#00000000'
     },
-    GoogleAuth: {
-      scopes: ['profile', 'email'],
-      serverClientId: '944708960468-eqn03vl8rm1p24ghfbkt8m9enlijlld6.apps.googleusercontent.com',
-      forceCodeForRefreshToken: true
-    },
-    AdMob: {
-      appId: 'ca-app-pub-4789683198372521~7914037351',
-      requestTrackingAuthorization: true,
-      testDeviceIdentifiers: []
-    },
-    // Keyboard configuration for better native feel
     Keyboard: {
       resize: 'body',
       style: 'dark',
       resizeOnFullScreen: true
     },
-    // App configuration
     App: {
-      // Let JavaScript handle back button
       launchShowDuration: 0
     }
   }
