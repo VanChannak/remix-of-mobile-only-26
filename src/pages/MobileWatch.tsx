@@ -234,16 +234,22 @@ const MobileWatch = () => {
   const handleEpisodeClick = async (ep: Episode) => {
     const seasonNum = seasons.find((s) => s.id === ep.season_id)?.season_number || 1;
 
-    // On Android native, use ExoPlayer
-    if (isExoPlayerAvailable()) {
-      const { data: sources } = await supabase
-        .from("video_sources")
-        .select("*")
-        .eq("episode_id", ep.id)
-        .order("is_default", { ascending: false });
+    // Fetch video sources first
+    const { data: sources } = await supabase
+      .from("video_sources")
+      .select("*")
+      .eq("episode_id", ep.id)
+      .order("is_default", { ascending: false });
 
-      if (sources && sources.length > 0) {
-        const source = sources[0];
+    // Check if source is a direct URL (not embed) - only then use ExoPlayer
+    if (isExoPlayerAvailable() && sources && sources.length > 0) {
+      const source = sources[0];
+      
+      // Only use ExoPlayer for direct MP4/HLS URLs, not embed URLs
+      const isDirectUrl = source.url && !source.embed_url && 
+        (source.url.includes('.mp4') || source.url.includes('.m3u8') || source.source_type !== 'embed');
+      
+      if (isDirectUrl) {
         let videoUrl = source.url;
 
         if (source.quality_urls && typeof source.quality_urls === "object") {
@@ -267,9 +273,14 @@ const MobileWatch = () => {
       }
     }
 
-    // Web fallback - update URL and play inline
+    // For embed URLs or web fallback - update inline player
     setCurrentEpisode(ep);
-    fetchVideoSource(ep.id);
+    if (sources && sources.length > 0) {
+      setVideoSources(sources as VideoSource[]);
+    } else {
+      // Fetch video sources if not already fetched
+      fetchVideoSource(ep.id);
+    }
     navigate(`/watch/${type}/${id}/${seasonNum}/${ep.episode_number}`, { replace: true });
   };
 
@@ -362,28 +373,43 @@ const MobileWatch = () => {
           </div>
         </div>
 
-        {/* Action Buttons - aligned right */}
-        <div className="flex items-center justify-end gap-5 mb-4">
-          <button className="flex flex-col items-center gap-1" onClick={() => navigate(-1)}>
-            <ChevronLeft className="h-5 w-5 text-white/70" />
-            <span className="text-[10px] text-white/70">Back</span>
+        {/* Action Buttons - Join VIP on left, other actions on right */}
+        <div className="flex items-center justify-between mb-4">
+          {/* Join VIP Button - Left side */}
+          <button 
+            className="flex flex-col items-center gap-1 px-3 py-1.5 bg-white/10 border border-white/20 rounded-lg backdrop-blur-sm"
+            onClick={() => {
+              const event = new CustomEvent('openSubscriptionDialog');
+              window.dispatchEvent(event);
+            }}
+          >
+            <Crown className="h-5 w-5 text-yellow-400" />
+            <span className="text-[10px] text-yellow-400 font-medium">Join VIP</span>
           </button>
-          <button className="flex flex-col items-center gap-1">
-            <ThumbsUp className="h-5 w-5 text-white/70" />
-            <span className="text-[10px] text-white/70">Like</span>
-          </button>
-          <button className="flex flex-col items-center gap-1">
-            <ThumbsUp className="h-5 w-5 text-white/70 rotate-180" />
-            <span className="text-[10px] text-white/70">Dislike</span>
-          </button>
-          <button className="flex flex-col items-center gap-1">
-            <Share2 className="h-5 w-5 text-white/70" />
-            <span className="text-[10px] text-white/70">Share</span>
-          </button>
-          <button className="flex flex-col items-center gap-1">
-            <Bookmark className="h-5 w-5 text-white/70" />
-            <span className="text-[10px] text-white/70">Save</span>
-          </button>
+          
+          {/* Other Action Buttons - Right side */}
+          <div className="flex items-center gap-5">
+            <button className="flex flex-col items-center gap-1" onClick={() => navigate(-1)}>
+              <ChevronLeft className="h-5 w-5 text-white/70" />
+              <span className="text-[10px] text-white/70">Back</span>
+            </button>
+            <button className="flex flex-col items-center gap-1">
+              <ThumbsUp className="h-5 w-5 text-white/70" />
+              <span className="text-[10px] text-white/70">Like</span>
+            </button>
+            <button className="flex flex-col items-center gap-1">
+              <ThumbsUp className="h-5 w-5 text-white/70 rotate-180" />
+              <span className="text-[10px] text-white/70">Dislike</span>
+            </button>
+            <button className="flex flex-col items-center gap-1">
+              <Share2 className="h-5 w-5 text-white/70" />
+              <span className="text-[10px] text-white/70">Share</span>
+            </button>
+            <button className="flex flex-col items-center gap-1">
+              <Bookmark className="h-5 w-5 text-white/70" />
+              <span className="text-[10px] text-white/70">Save</span>
+            </button>
+          </div>
         </div>
 
         {/* Cast */}
