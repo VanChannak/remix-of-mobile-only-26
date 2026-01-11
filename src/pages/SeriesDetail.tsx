@@ -12,6 +12,7 @@ import { ShareDialog } from "@/components/ShareDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Capacitor } from '@capacitor/core';
 import { playWithExoPlayer, isExoPlayerAvailable } from '@/hooks/useExoPlayer';
+import { TrailerDialog } from "@/components/TrailerDialog";
 
 interface Content {
   id: string;
@@ -70,6 +71,7 @@ const SeriesDetail = () => {
   const [selectedCastMember, setSelectedCastMember] = useState<CastMember | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
+  const [showTrailerDialog, setShowTrailerDialog] = useState(false);
   const [isInList, setIsInList] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
 
@@ -262,7 +264,7 @@ const SeriesDetail = () => {
 
   const handlePlayTrailer = () => {
     if (trailerUrl) {
-      window.open(trailerUrl, '_blank');
+      setShowTrailerDialog(true);
     } else {
       toast({ title: "No trailer available" });
     }
@@ -435,7 +437,7 @@ const SeriesDetail = () => {
           {/* Synopsis */}
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Synopsis</h3>
-            <p className="text-sm text-white/70 leading-relaxed">
+            <p className="text-sm text-white/70 leading-relaxed text-justify">
               {content.overview || 'No synopsis available.'}
             </p>
           </div>
@@ -625,6 +627,14 @@ const SeriesDetail = () => {
           contentType="series"
         />
       )}
+
+      {/* Trailer Dialog */}
+      <TrailerDialog
+        open={showTrailerDialog}
+        onOpenChange={setShowTrailerDialog}
+        trailerUrl={trailerUrl}
+        title={`${content?.title || ''} - Trailer`}
+      />
     </div>
   );
 };
