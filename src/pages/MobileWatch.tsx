@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommentsSection } from "@/components/CommentsSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { playWithExoPlayer, isExoPlayerAvailable } from "@/hooks/useExoPlayer";
-import { AdMob, AdOptions, BannerAdSize, BannerAdPosition } from "@capacitor-community/admob";
+import { AdMob, BannerAdOptions, BannerAdSize, BannerAdPosition } from "@capacitor-community/admob";
 
 interface Episode {
   id: string;
@@ -77,7 +77,7 @@ const MobileWatch = () => {
   useEffect(() => {
     const showBanner = async () => {
       try {
-        const options: AdOptions = {
+        const options: BannerAdOptions = {
           adId: "ca-app-pub-4789683198372521/6279462067", // Your Banner Ad ID
           adSize: BannerAdSize.BANNER,
           position: BannerAdPosition.BOTTOM_CENTER,
